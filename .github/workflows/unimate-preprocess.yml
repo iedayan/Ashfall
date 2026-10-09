@@ -74,20 +74,10 @@ jobs:
           OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
         run: |
           set -euo pipefail
-          python -c "
-import traceback
-import sys
-try:
-    from data_process.rig_preprocess.cli import main
-    sys.argv = ['rig_preprocess', 'run',
-        '--input', '$ASSET_PATH',
-        '--output_dir', '$OUTPUT_DIR',
-        '--annotate', 'rule', '--no_review', '--save_clips']
-    sys.exit(main())
-except Exception as e:
-    traceback.print_exc()
-    sys.exit(1)
-          " 2>&1
+          python -m data_process.rig_preprocess run \
+            --input "$ASSET_PATH" \
+            --output_dir "$OUTPUT_DIR" \
+            --annotate rule --no_review --save_clips 2>&1 || (echo "Exit code: $?"; exit 1)
           echo "asset_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
 
       - name: Upload preprocessed asset
