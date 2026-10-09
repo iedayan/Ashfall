@@ -73,6 +73,7 @@ jobs:
           ASSET_PATH: ${{ github.workspace }}/ashfall/${{ github.event.inputs.asset }}
           OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
           PYTHONFAULTHANDLER: 1
+          LOGURU_LEVEL: DEBUG
         run: |
           set -euo pipefail
           python -m data_process.rig_preprocess run \
