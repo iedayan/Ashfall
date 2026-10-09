@@ -28,9 +28,16 @@ except Exception as e:
 
 print("=== Calling main ===", file=sys.stderr)
 
-from data_process.rig_preprocess.cli import main
-sys.argv = ['rig_preprocess', 'run',
-    '--input', os.environ['ASSET_PATH'],
-    '--output_dir', os.environ['OUTPUT_DIR'],
-    '--annotate', 'rule', '--no_review', '--save_clips']
-sys.exit(main())
+try:
+    from data_process.rig_preprocess.cli import main
+    sys.argv = ['rig_preprocess', 'run',
+        '--input', os.environ['ASSET_PATH'],
+        '--output_dir', os.environ['OUTPUT_DIR'],
+        '--annotate', 'rule', '--no_review', '--save_clips']
+    sys.exit(main())
+except Exception as e:
+    print(f"=== EXCEPTION CAUGHT ===", file=sys.stderr)
+    print(f"Exception type: {type(e).__name__}", file=sys.stderr)
+    print(f"Exception message: {e}", file=sys.stderr)
+    traceback.print_exc()
+    sys.exit(1)
