@@ -72,11 +72,13 @@ jobs:
         env:
           ASSET_PATH: ${{ github.workspace }}/ashfall/${{ github.event.inputs.asset }}
           OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
+          PYTHONFAULTHANDLER: 1
         run: |
+          set -euo pipefail
           python -m data_process.rig_preprocess run \
             --input "$ASSET_PATH" \
             --output_dir "$OUTPUT_DIR" \
-            --annotate rule --no_review --save_clips
+            --annotate rule --no_review --save_clips 2>&1
           echo "asset_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
 
       - name: Upload preprocessed asset
@@ -134,7 +136,9 @@ jobs:
           ASSET_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
           OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/samples/${{ github.event.inputs.output_name }}
           PROMPTS: ${{ github.event.inputs.prompts }}
+          PYTHONFAULTHANDLER: 1
         run: |
+          set -euo pipefail
           # Convert prompts to array
           PROMPT_ARRAY=()
           while IFS= read -r line; do
@@ -147,7 +151,7 @@ jobs:
             --prompt "${PROMPT_ARRAY[@]}" \
             --num_repetitions 3 \
             --cfg_scale 5 \
-            --output_dir "$OUTPUT_DIR"
+            --output_dir "$OUTPUT_DIR" 2>&1
 
       - name: Drive meshes (generate animated GLBs)
         shell: bash -l {0}
@@ -155,7 +159,8 @@ jobs:
         env:
           SAMPLES_DIR: ${{ github.workspace }}/unimate/outputs/samples/${{ github.event.inputs.output_name }}
         run: |
-          SKIP_INVALID=1 bash scripts/run_animate_motion.sh "$SAMPLES_DIR"
+          set -euo pipefail
+          SKIP_INVALID=1 bash scripts/run_animate_motion.sh "$SAMPLES_DIR" 2>&1
 
       - name: Upload generated animations
         uses: actions/upload-artifact@v4
