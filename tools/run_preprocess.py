@@ -2,6 +2,12 @@ import traceback
 import sys
 import os
 sys.path.insert(0, '.')
+
+# Set loguru to trace level for more verbose output
+import loguru
+loguru.logger.remove()
+loguru.logger.add(sys.stderr, level="TRACE")
+
 try:
     from data_process.rig_preprocess.cli import main
     sys.argv = ['rig_preprocess', 'run',
