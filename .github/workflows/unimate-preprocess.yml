@@ -46,7 +46,7 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-name: unimate
-          python-version: "3.10"
+          create-args: python=3.10
           cache-environment: true
 
       - name: Install UniMate dependencies
@@ -108,7 +108,7 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-name: unimate
-          python-version: "3.10"
+          create-args: python=3.10
           cache-environment: true
 
       - name: Install UniMate dependencies
