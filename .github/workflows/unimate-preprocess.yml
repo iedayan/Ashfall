@@ -190,21 +190,8 @@ jobs:
           find animations -name "*.glb" -o -name "*.fbx" | while read f; do
             cp "$f" godot-import/animations/
           done
-          # Create manifest
-          cat > godot-import/ANIMATION_MANIFEST.json << 'EOF'
-          {
-            "asset": "${{ github.event.inputs.output_name }}",
-            "canonical_mesh": "${{ github.event.inputs.output_name }}.glb",
-            "animations": [
-EOF
-          find animations -name "*.glb" -o -name "*.fbx" | sed 's|.*/||' | sort | while read f; do
-            name="${f%.*}"
-            echo "              {\"file\": \"animations/$f\", \"name\": \"$name\", \"type\": \"generated\"}," >> godot-import/ANIMATION_MANIFEST.json
-          done
-          cat >> godot-import/ANIMATION_MANIFEST.json << 'EOF'
-            ]
-          }
-          EOF
+          # Create manifest using Python (single line to avoid YAML issues)
+          python3 -c "import json, os, glob; animations = sorted(glob.glob('animations/*.glb') + glob.glob('animations/*.fbx')); manifest = {'asset': '${{ github.event.inputs.output_name }}', 'canonical_mesh': '${{ github.event.inputs.output_name }}.glb', 'animations': [{'file': 'animations/' + os.path.basename(f), 'name': os.path.splitext(os.path.basename(f))[0], 'type': 'generated'} for f in animations]}; open('godot-import/ANIMATION_MANIFEST.json', 'w').write(json.dumps(manifest, indent=2))"
 
       - name: Upload Godot import package
         uses: actions/upload-artifact@v4
