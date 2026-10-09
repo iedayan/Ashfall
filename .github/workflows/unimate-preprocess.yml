@@ -74,10 +74,8 @@ jobs:
           OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
         run: |
           set -euo pipefail
-          python -m data_process.rig_preprocess run \
-            --input "$ASSET_PATH" \
-            --output_dir "$OUTPUT_DIR" \
-            --annotate rule --no_review --save_clips 2>&1 || (echo "Exit code: $?"; exit 1)
+          cp ${{ github.workspace }}/ashfall/tools/run_preprocess.py /tmp/run_preprocess.py
+          python /tmp/run_preprocess.py 2>&1
           echo "asset_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
 
       - name: Upload preprocessed asset
