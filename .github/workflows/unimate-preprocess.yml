@@ -1,0 +1,214 @@
+name: UniMate Preprocess & Animate
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset:
+        description: 'Asset to preprocess'
+        required: true
+        default: 'assets/characters/raw/rifleman/rifleman_rigged.glb'
+      output_name:
+        description: 'Output asset name'
+        required: true
+        default: 'rifleman'
+      prompts:
+        description: 'Animation prompts (one per line)'
+        required: false
+        default: |
+          An object shoots a rifle.
+          An object reloads a rifle.
+          An object dodges left.
+          An object performs a melee attack.
+          An object aims down sights.
+          An object idles with weapon ready.
+
+jobs:
+  preprocess:
+    name: Preprocess Asset
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      asset_dir: ${{ steps.preprocess.outputs.asset_dir }}
+    steps:
+      - name: Checkout UniMate
+        uses: actions/checkout@v4
+        with:
+          repository: Friedrich-M/UniMate
+          path: unimate
+
+      - name: Checkout Ashfall (for asset)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          path: ashfall
+
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: unimate
+          python-version: "3.10"
+          cache-environment: true
+
+      - name: Install UniMate dependencies
+        shell: bash -l {0}
+        working-directory: ./unimate
+        run: |
+          pip install "setuptools<81"
+          pip install -r requirements.txt --no-build-isolation
+
+      - name: Download UniMate checkpoint
+        shell: bash -l {0}
+        working-directory: ./unimate
+        run: |
+          hf download Linzhan/UniMate --repo-type model --local-dir outputs \
+            --include "unimate_uniml3d_f60_v3/*.json" \
+            --include "unimate_uniml3d_f60_v3/*.npy" \
+            --include "unimate_uniml3d_f60_v3/checkpoints/checkpoint_step_150000.pt"
+
+      - name: Run rig_preprocess
+        id: preprocess
+        shell: bash -l {0}
+        working-directory: ./unimate
+        env:
+          ASSET_PATH: ${{ github.workspace }}/ashfall/${{ github.event.inputs.asset }}
+          OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
+        run: |
+          python -m data_process.rig_preprocess run \
+            --input "$ASSET_PATH" \
+            --output_dir "$OUTPUT_DIR" \
+            --annotate rule --no_review --save_clips
+          echo "asset_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
+
+      - name: Upload preprocessed asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: unimate-${{ github.event.inputs.output_name }}-preprocessed
+          path: unimate/outputs/rig/${{ github.event.inputs.output_name }}/
+          retention-days: 7
+
+  generate-animations:
+    name: Generate Animations
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: preprocess
+    steps:
+      - name: Checkout UniMate
+        uses: actions/checkout@v4
+        with:
+          repository: Friedrich-M/UniMate
+          path: unimate
+
+      - name: Download preprocessed asset
+        uses: actions/download-artifact@v4
+        with:
+          name: unimate-${{ github.event.inputs.output_name }}-preprocessed
+          path: unimate/outputs/rig/${{ github.event.inputs.output_name }}
+
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: unimate
+          python-version: "3.10"
+          cache-environment: true
+
+      - name: Install UniMate dependencies
+        shell: bash -l {0}
+        working-directory: ./unimate
+        run: |
+          pip install "setuptools<81"
+          pip install -r requirements.txt --no-build-isolation
+
+      - name: Download UniMate checkpoint
+        shell: bash -l {0}
+        working-directory: ./unimate
+        run: |
+          hf download Linzhan/UniMate --repo-type model --local-dir outputs \
+            --include "unimate_uniml3d_f60_v3/*.json" \
+            --include "unimate_uniml3d_f60_v3/*.npy" \
+            --include "unimate_uniml3d_f60_v3/checkpoints/checkpoint_step_150000.pt"
+
+      - name: Generate animations
+        shell: bash -l {0}
+        working-directory: ./unimate
+        env:
+          ASSET_DIR: ${{ github.workspace }}/unimate/outputs/rig/${{ github.event.inputs.output_name }}
+          OUTPUT_DIR: ${{ github.workspace }}/unimate/outputs/samples/${{ github.event.inputs.output_name }}
+          PROMPTS: ${{ github.event.inputs.prompts }}
+        run: |
+          # Convert prompts to array
+          PROMPT_ARRAY=()
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && PROMPT_ARRAY+=("$line")
+          done <<< "$PROMPTS"
+
+          python -m unimate.inference.sample \
+            --exp_dir outputs/unimate_uniml3d_f60_v3 \
+            --asset "$ASSET_DIR" \
+            --prompt "${PROMPT_ARRAY[@]}" \
+            --num_repetitions 3 \
+            --cfg_scale 5 \
+            --output_dir "$OUTPUT_DIR"
+
+      - name: Drive meshes (generate animated GLBs)
+        shell: bash -l {0}
+        working-directory: ./unimate
+        env:
+          SAMPLES_DIR: ${{ github.workspace }}/unimate/outputs/samples/${{ github.event.inputs.output_name }}
+        run: |
+          SKIP_INVALID=1 bash scripts/run_animate_motion.sh "$SAMPLES_DIR"
+
+      - name: Upload generated animations
+        uses: actions/upload-artifact@v4
+        with:
+          name: unimate-${{ github.event.inputs.output_name }}-animations
+          path: unimate/outputs/samples/${{ github.event.inputs.output_name }}/
+          retention-days: 7
+
+  build-godot-import:
+    name: Build Godot Import Package
+    runs-on: ubuntu-latest
+    needs: [preprocess, generate-animations]
+    steps:
+      - name: Download preprocessed asset
+        uses: actions/download-artifact@v4
+        with:
+          name: unimate-${{ github.event.inputs.output_name }}-preprocessed
+          path: preprocessed
+
+      - name: Download generated animations
+        uses: actions/download-artifact@v4
+        with:
+          name: unimate-${{ github.event.inputs.output_name }}-animations
+          path: animations
+
+      - name: Create import package
+        run: |
+          mkdir -p godot-import/animations
+          # Copy canonical mesh
+          cp preprocessed/${{ github.event.inputs.output_name }}.glb godot-import/
+          # Copy all generated animation GLBs/FBXs
+          find animations -name "*.glb" -o -name "*.fbx" | while read f; do
+            cp "$f" godot-import/animations/
+          done
+          # Create manifest
+          cat > godot-import/ANIMATION_MANIFEST.json << 'EOF'
+          {
+            "asset": "${{ github.event.inputs.output_name }}",
+            "canonical_mesh": "${{ github.event.inputs.output_name }}.glb",
+            "animations": [
+EOF
+          find animations -name "*.glb" -o -name "*.fbx" | sed 's|.*/||' | sort | while read f; do
+            name="${f%.*}"
+            echo "              {\"file\": \"animations/$f\", \"name\": \"$name\", \"type\": \"generated\"}," >> godot-import/ANIMATION_MANIFEST.json
+          done
+          cat >> godot-import/ANIMATION_MANIFEST.json << 'EOF'
+            ]
+          }
+          EOF
+
+      - name: Upload Godot import package
+        uses: actions/upload-artifact@v4
+        with:
+          name: unimate-${{ github.event.inputs.output_name }}-godot-import
+          path: godot-import/
+          retention-days: 30
