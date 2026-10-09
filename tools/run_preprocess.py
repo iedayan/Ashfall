@@ -13,7 +13,21 @@ from data_process.rig_preprocess import cli as cli_module
 cli_module.logger.remove()
 cli_module.logger.add(sys.stderr, level="TRACE", backtrace=True, diagnose=True)
 
-# Don't catch - let exception propagate for full traceback
+print("=== Starting rig_preprocess ===", file=sys.stderr)
+print(f"ASSET_PATH={os.environ.get('ASSET_PATH')}", file=sys.stderr)
+print(f"OUTPUT_DIR={os.environ.get('OUTPUT_DIR')}", file=sys.stderr)
+
+# Test bpy import
+print("=== Testing bpy import ===", file=sys.stderr)
+try:
+    import bpy
+    print(f"bpy version: {bpy.app.version_string}", file=sys.stderr)
+except Exception as e:
+    print(f"bpy import failed: {e}", file=sys.stderr)
+    traceback.print_exc()
+
+print("=== Calling main ===", file=sys.stderr)
+
 from data_process.rig_preprocess.cli import main
 sys.argv = ['rig_preprocess', 'run',
     '--input', os.environ['ASSET_PATH'],
