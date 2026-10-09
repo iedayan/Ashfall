@@ -13,13 +13,10 @@ from data_process.rig_preprocess import cli as cli_module
 cli_module.logger.remove()
 cli_module.logger.add(sys.stderr, level="TRACE", backtrace=True, diagnose=True)
 
-try:
-    from data_process.rig_preprocess.cli import main
-    sys.argv = ['rig_preprocess', 'run',
-        '--input', os.environ['ASSET_PATH'],
-        '--output_dir', os.environ['OUTPUT_DIR'],
-        '--annotate', 'rule', '--no_review', '--save_clips']
-    sys.exit(main())
-except Exception as e:
-    traceback.print_exc()
-    sys.exit(1)
+# Don't catch - let exception propagate for full traceback
+from data_process.rig_preprocess.cli import main
+sys.argv = ['rig_preprocess', 'run',
+    '--input', os.environ['ASSET_PATH'],
+    '--output_dir', os.environ['OUTPUT_DIR'],
+    '--annotate', 'rule', '--no_review', '--save_clips']
+sys.exit(main())
